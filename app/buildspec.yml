@@ -10,7 +10,7 @@ phases:
     commands:
       - echo Build the Docker image...
       - docker build -t react-app .
-      - docker tag react-app:latest $ACCOUNT_ID.dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com/react-app:latest
+      - docker tag react-app:latest $ACCOUNT_ID.dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com/react-app-ia-cloud-projet:latest
 
   post_build:
     commands:
