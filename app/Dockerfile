@@ -1,20 +1,30 @@
-# Utiliser l'image Node.js pour le développement
-FROM node:20-alpine
+# ---- Étape 1 : Construire l'app React ----
+FROM node:20-alpine AS builder
 
-# Définir le répertoire de travail
+# Définir le répertoire de travail dans le conteneur
 WORKDIR /app
 
-# Copier les fichiers de dépendances
-COPY package.json package-lock.json ./
+# Copier les fichiers de dépendances depuis le dossier "app"
+COPY app/package*.json ./
 
 # Installer les dépendances
 RUN npm install
 
-# Copier le reste des fichiers de l'application
-COPY . .
+# Copier l'ensemble du code source depuis "app"
+COPY app/ .
 
-# Exposer le port 3000 (port par défaut de React en développement)
-EXPOSE 3000
+# Construire l'application (génère le dossier "build")
+RUN npm run build
 
-# Démarrer l'application en mode développement
-CMD ["npm", "start"]
+# ---- Étape 2 : Servir l'app avec Nginx ----
+FROM nginx:alpine
+
+# Copier les fichiers buildés dans le répertoire de Nginx
+COPY --from=builder /app/build /usr/share/nginx/html
+
+# Exposer le port 80 (où Nginx écoute par défaut)
+EXPOSE 80
+
+# Démarrer Nginx
+CMD ["nginx", "-g", "daemon off;"]
+    
