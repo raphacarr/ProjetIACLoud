@@ -3,23 +3,23 @@ version: 0.2
 phases:
   pre_build:
     commands:
-      - echo Logging in to Amazon ECR...
+      - echo "Logging in to Amazon ECR..."
       - aws ecr get-login-password --region $AWS_DEFAULT_REGION | docker login --username AWS --password-stdin $ACCOUNT_ID.dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com
 
   build:
     commands:
-      - echo Build the Docker image...
+      - echo "Building the Docker image..."
       - docker build -t react-app .
       - docker tag react-app:latest $ACCOUNT_ID.dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com/react-app-ia-cloud-projet:latest
 
   post_build:
     commands:
-      - echo Pushing the Docker image...
-      - docker push $ACCOUNT_ID.dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com/react-app:latest
-      - echo Writing image definitions file...
-      # On enregistre l'image pour la suite du pipeline (si AppRunner ou ECS ECS)
-      - printf '[{"name":"react-app","imageUri":"%s/react-app:latest"}]' $ACCOUNT_ID.dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com > imagedefinitions.json
+      - echo "Pushing the Docker image to ECR..."
+      - docker push $ACCOUNT_ID.dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com/react-app-ia-cloud-projet:latest
+      - echo "Build completed on `date`"
+      # Optionnel: on peut créer un imagedefinitions.json si on déploie sur ECS
+      # - printf '[{"name":"react-app","imageUri":"%s/react-app-ia-cloud-projet:latest"}]' $ACCOUNT_ID.dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com > imagedefinitions.json
 
 artifacts:
   files:
-    - imagedefinitions.json
+    # - imagedefinitions.json  # only if using ECS fargate-based deployment
