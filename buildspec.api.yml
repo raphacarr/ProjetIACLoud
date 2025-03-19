@@ -1,0 +1,18 @@
+version: 0.2
+
+phases:
+  pre_build:
+    commands:
+      - echo "Logging in to Amazon ECR for API..."
+      - aws ecr get-login-password --region $AWS_DEFAULT_REGION | docker login --username AWS --password-stdin $ACCOUNT_ID.dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com
+  build:
+    commands:
+      - echo "Building the FastAPI API Docker image..."
+      - docker build -t fastapi-api -f api/Dockerfile.api api/
+      - docker tag fastapi-api:latest $ACCOUNT_ID.dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com/fastapi-api-ia-cloud-projet:latest
+  post_build:
+    commands:
+      - echo "Pushing the FastAPI API Docker image to ECR..."
+      - docker push $ACCOUNT_ID.dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com/fastapi-api-ia-cloud-projet:latest
+artifacts:
+  files: []
