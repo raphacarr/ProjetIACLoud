@@ -2,24 +2,19 @@ FROM python:3.10-slim
 
 WORKDIR /app
 
-# Installation des dépendances système nécessaires
-RUN apt-get update && apt-get install -y \
-    build-essential \
-    git \
-    && rm -rf /var/lib/apt/lists/*
-
-# Copie des fichiers de dépendances et installation
+# Installer les dépendances
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
+RUN pip install gunicorn
 
-# Copie du code de l'application
-COPY app.py .
+# Copier le code de l'application
+COPY . .
 
-# Variable d'environnement pour le chemin du modèle
-ENV MODEL_PATH=/app/model
-
-# Exposition du port
+# Exposer le port sur lequel l'application s'exécutera
 EXPOSE 8000
 
-# Commande de démarrage
-CMD ["uvicorn", "app:app", "--host", "0.0.0.0", "--port", "8000"]
+# Définir les variables d'environnement
+ENV MODEL_PATH="/app/model"
+
+# Commande pour démarrer l'application
+CMD ["gunicorn", "--bind", "0.0.0.0:8000", "-k", "uvicorn.workers.UvicornWorker", "app:app"]
