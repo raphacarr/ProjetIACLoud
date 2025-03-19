@@ -18,7 +18,11 @@ app = FastAPI(title="DreamBooth Disney Style API",
 # Configuration CORS
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # À modifier en production pour limiter aux origines autorisées
+    allow_origins=[
+        os.environ.get("FRONTEND_URL", "*"),
+        "https://mvrmruieji.eu-west-3.awsapprunner.com",  # URL spécifique de votre frontend
+        "http://localhost:3000"  # Pour le développement local
+    ],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -59,26 +63,48 @@ history = []  # Historique des images générées
 def load_model():
     global model
     if model is None:
-        model_path = os.environ.get("MODEL_PATH", "../model")  
         try:
+            model_path = os.environ.get("MODEL_PATH", "../model")
+            print(f"Chargement du modèle depuis {model_path}...")
+            
+            # Vérifier si le modèle existe, sinon le télécharger
+            if not os.path.exists(model_path) or len(os.listdir(model_path)) == 0:
+                print("Modèle non trouvé, téléchargement depuis Hugging Face...")
+                # Créer le répertoire si nécessaire
+                os.makedirs(model_path, exist_ok=True)
+                
+                # Télécharger le modèle depuis Hugging Face
+                from huggingface_hub import snapshot_download
+                snapshot_download(
+                    repo_id="runwayml/stable-diffusion-v1-5",  # Modèle de base Stable Diffusion
+                    local_dir=model_path,
+                    ignore_patterns=["*.safetensors", "*.bin", "*.onnx"]  # Télécharger uniquement les fichiers nécessaires
+                )
+                print(f"Modèle téléchargé avec succès dans {model_path}")
+            
+            # Optimisations pour réduire l'utilisation de la mémoire
             model = StableDiffusionPipeline.from_pretrained(
                 model_path,
-                torch_dtype=torch.float16 if device == "cuda" else torch.float32
+                torch_dtype=torch.float16 if torch.cuda.is_available() else torch.float32,
+                safety_checker=None,  # Désactiver le safety checker pour économiser de la mémoire
+                requires_safety_checker=False
             )
-            model.to(device)
-            # Optimisation pour réduire l'utilisation de la mémoire
-            if device == "cuda":
+            
+            # Si CUDA est disponible, utiliser la moitié de précision et déplacer sur GPU
+            if torch.cuda.is_available():
+                model = model.to("cuda")
+                print("Modèle chargé sur GPU avec succès")
+            else:
+                # Optimisations pour CPU
                 model.enable_attention_slicing()
+                print("Modèle chargé sur CPU avec succès (attention slicing activé)")
+                
+            return model
         except Exception as e:
-            print(f"Erreur lors du chargement du modèle: {e}")
-            # Fallback au modèle de base si le modèle fine-tuné n'est pas disponible
-            model = StableDiffusionPipeline.from_pretrained(
-                "runwayml/stable-diffusion-v1-5",
-                torch_dtype=torch.float16 if device == "cuda" else torch.float32
-            )
-            model.to(device)
-            if device == "cuda":
-                model.enable_attention_slicing()
+            print(f"Erreur lors du chargement du modèle: {str(e)}")
+            model = None
+            return None
+    return model
 
 # Fonction pour convertir une image PIL en base64
 def pil_to_base64(image):
@@ -105,7 +131,10 @@ def save_to_history(prompt, style, image_base64):
 
 @app.on_event("startup")
 async def startup_event():
-    load_model()
+    # Chargement du modèle en arrière-plan pour ne pas bloquer le démarrage
+    import threading
+    threading.Thread(target=load_model).start()
+    print("Démarrage de l'API - Chargement du modèle en arrière-plan")
 
 @app.get("/")
 async def root():
