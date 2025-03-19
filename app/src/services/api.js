@@ -1,8 +1,18 @@
 import axios from 'axios';
 
+// Déterminer l'URL de l'API en fonction de l'environnement
+const getApiUrl = () => {
+  // En production (sur App Runner), utiliser l'URL de l'API déployée
+  if (process.env.NODE_ENV === 'production') {
+    return 'https://5enhg3mjkn.eu-west-3.awsapprunner.com';
+  }
+  // En développement, utiliser localhost
+  return process.env.REACT_APP_API_URL || 'http://localhost:8000';
+};
+
 // Créer une instance axios avec une configuration de base
 const api = axios.create({
-  baseURL: process.env.REACT_APP_API_URL || 'http://localhost:8000',
+  baseURL: getApiUrl(),
   headers: {
     'Content-Type': 'application/json',
   },
