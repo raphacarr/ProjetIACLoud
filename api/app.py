@@ -145,7 +145,8 @@ async def root():
             "transform": "/transform",
             "history": "/history",
             "styles": "/styles",
-            "health": "/health"
+            "health": "/health",
+            "test": "/test"
         }
     }   
 
