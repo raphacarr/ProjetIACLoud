@@ -1,6 +1,6 @@
 # DreamStyle Generator
 
-Application web de génération et transformation d'images utilisant Stable Diffusion et React.
+Application web de génération et transformation d'images utilisant Stable Diffusion et React réalisé apr le groupe M2Data Scientist Raph Keenan Noah Tharse Thoms.
 
 ## Architecture
 
