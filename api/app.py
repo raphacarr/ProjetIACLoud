@@ -138,7 +138,16 @@ async def startup_event():
 
 @app.get("/")
 async def root():
-    return {"message": "Bienvenue sur l'API DreamBooth Disney Style"}
+    return {
+        "message": "Bienvenue sur l'API DreamBooth Disney Style",
+        "endpoints": {
+            "generate": "/generate",
+            "transform": "/transform",
+            "history": "/history",
+            "styles": "/styles",
+            "health": "/health"
+        }
+    }   
 
 @app.post("/generate", response_model=ImageResponse)
 async def generate_image(request: ImageRequest, background_tasks: BackgroundTasks):
