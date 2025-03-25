@@ -4,6 +4,7 @@ import base64
 from io import BytesIO
 from fastapi import FastAPI, HTTPException, BackgroundTasks, UploadFile, File, Form
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import RedirectResponse
 from pydantic import BaseModel
 from diffusers import StableDiffusionPipeline
 from PIL import Image
@@ -12,8 +13,8 @@ import uuid
 from datetime import datetime
 from typing import List, Optional
 
-app = FastAPI(title="DreamBooth Disney Style API", 
-              description="API pour générer des images avec un style Disney via DreamBooth")
+app = FastAPI(title="API projet IA Cloud - DreamGenerator", 
+              description="API pour générer des images avec différents styles via DreamBooth")
 
 # Configuration CORS
 app.add_middleware(
@@ -138,17 +139,7 @@ async def startup_event():
 
 @app.get("/")
 async def root():
-    return {
-        "message": "Bienvenue sur l'API DreamBooth Disney Style",
-        "endpoints": {
-            "generate": "/generate",
-            "transform": "/transform",
-            "history": "/history",
-            "styles": "/styles",
-            "health": "/health",
-            "test": "/test"
-        }
-    }   
+    return RedirectResponse(url="/docs")
 
 @app.post("/generate", response_model=ImageResponse)
 async def generate_image(request: ImageRequest, background_tasks: BackgroundTasks):
