@@ -11,7 +11,7 @@ from PIL import Image
 import json
 import uuid
 from datetime import datetime
-from typing import List, Optional
+from typing import List, Optional, Dict
 
 app = FastAPI(title="API projet IA Cloud - DreamGenerator", 
               description="API pour générer des images avec différents styles via DreamBooth")
@@ -56,56 +56,108 @@ class HistoryEntry(BaseModel):
     createdAt: str
 
 # Variables globales
-model = None
+models = {}  # Dictionnaire pour stocker les différents modèles
 device = "cuda" if torch.cuda.is_available() else "cpu"
 history = []  # Historique des images générées
 
-# Fonction pour charger le modèle
-def load_model():
-    global model
-    if model is None:
-        try:
-            model_path = os.environ.get("MODEL_PATH", "../model")
-            print(f"Chargement du modèle depuis {model_path}...")
+# Répertoire des modèles
+LOCAL_MODELS_DIR = os.environ.get("MODEL_PATH", "../model")
+
+
+
+# Fonction pour charger le modèle de base
+def load_base_model():
+    try:
+        model_path = os.path.join(LOCAL_MODELS_DIR, "base")
+        print(f"Chargement du modèle de base depuis {model_path}...")
+        
+        # Vérifier si le modèle existe, sinon le télécharger
+        if not os.path.exists(model_path) or len(os.listdir(model_path)) == 0:
+            print("Modèle de base non trouvé, téléchargement depuis Hugging Face...")
+            # Créer le répertoire si nécessaire
+            os.makedirs(model_path, exist_ok=True)
             
-            # Vérifier si le modèle existe, sinon le télécharger
-            if not os.path.exists(model_path) or len(os.listdir(model_path)) == 0:
-                print("Modèle non trouvé, téléchargement depuis Hugging Face...")
-                # Créer le répertoire si nécessaire
-                os.makedirs(model_path, exist_ok=True)
-                
-                # Télécharger le modèle depuis Hugging Face
-                from huggingface_hub import snapshot_download
-                snapshot_download(
-                    repo_id="runwayml/stable-diffusion-v1-5",  # Modèle de base Stable Diffusion
-                    local_dir=model_path,
-                    ignore_patterns=["*.safetensors", "*.bin", "*.onnx"]  # Télécharger uniquement les fichiers nécessaires
-                )
-                print(f"Modèle téléchargé avec succès dans {model_path}")
-            
-            # Optimisations pour réduire l'utilisation de la mémoire
-            model = StableDiffusionPipeline.from_pretrained(
-                model_path,
-                torch_dtype=torch.float16 if torch.cuda.is_available() else torch.float32,
-                safety_checker=None,  # Désactiver le safety checker pour économiser de la mémoire
-                requires_safety_checker=False
+            # Télécharger le modèle depuis Hugging Face
+            from huggingface_hub import snapshot_download
+            snapshot_download(
+                repo_id="runwayml/stable-diffusion-v1-5",  # Modèle de base Stable Diffusion
+                local_dir=model_path,
+                ignore_patterns=["*.safetensors", "*.bin", "*.onnx"]  # Télécharger uniquement les fichiers nécessaires
             )
+            print(f"Modèle de base téléchargé avec succès dans {model_path}")
+        
+        # Optimisations pour réduire l'utilisation de la mémoire
+        model = StableDiffusionPipeline.from_pretrained(
+            model_path,
+            torch_dtype=torch.float16 if torch.cuda.is_available() else torch.float32,
+            safety_checker=None,  # Désactiver le safety checker pour économiser de la mémoire
+            requires_safety_checker=False
+        )
+        
+        # Si CUDA est disponible, utiliser la moitié de précision et déplacer sur GPU
+        if torch.cuda.is_available():
+            model = model.to("cuda")
+            print("Modèle de base chargé sur GPU avec succès")
+        else:
+            # Optimisations pour CPU
+            model.enable_attention_slicing()
+            print("Modèle de base chargé sur CPU avec succès (attention slicing activé)")
             
-            # Si CUDA est disponible, utiliser la moitié de précision et déplacer sur GPU
-            if torch.cuda.is_available():
-                model = model.to("cuda")
-                print("Modèle chargé sur GPU avec succès")
-            else:
-                # Optimisations pour CPU
-                model.enable_attention_slicing()
-                print("Modèle chargé sur CPU avec succès (attention slicing activé)")
-                
-            return model
-        except Exception as e:
-            print(f"Erreur lors du chargement du modèle: {str(e)}")
-            model = None
-            return None
-    return model
+        return model
+    except Exception as e:
+        print(f"Erreur lors du chargement du modèle de base: {str(e)}")
+        return None
+
+# Fonction pour charger le modèle Disney
+def load_disney_model():
+    try:
+        model_path = os.path.join(LOCAL_MODELS_DIR, "disney")
+        print(f"Chargement du modèle Disney depuis {model_path}...")
+        
+        # Vérifier si le modèle existe
+        if not os.path.exists(model_path) or len(os.listdir(model_path)) == 0:
+            print("Modèle Disney non trouvé, utilisation du modèle de base à la place")
+            return load_base_model()
+        
+        # Optimisations pour réduire l'utilisation de la mémoire
+        model = StableDiffusionPipeline.from_pretrained(
+            model_path,
+            torch_dtype=torch.float16 if torch.cuda.is_available() else torch.float32,
+            safety_checker=None,  # Désactiver le safety checker pour économiser de la mémoire
+            requires_safety_checker=False
+        )
+        
+        # Si CUDA est disponible, utiliser la moitié de précision et déplacer sur GPU
+        if torch.cuda.is_available():
+            model = model.to("cuda")
+            print("Modèle Disney chargé sur GPU avec succès")
+        else:
+            # Optimisations pour CPU
+            model.enable_attention_slicing()
+            print("Modèle Disney chargé sur CPU avec succès (attention slicing activé)")
+            
+        return model
+    except Exception as e:
+        print(f"Erreur lors du chargement du modèle Disney: {str(e)}")
+        print("Utilisation du modèle de base à la place")
+        return load_base_model()
+
+# Fonction pour obtenir le modèle approprié en fonction du style
+def get_model_for_style(style):
+    global models
+    
+    # Si le style est Disney, utiliser le modèle Disney
+    if style == "sksdisney" or style == "disney":
+        if "disney" not in models:
+            print("Chargement du modèle Disney...")
+            models["disney"] = load_disney_model()
+        return models["disney"]
+    else:
+        # Pour tous les autres styles, utiliser le modèle de base
+        if "base" not in models:
+            print("Chargement du modèle de base...")
+            models["base"] = load_base_model()
+        return models["base"]
 
 # Fonction pour convertir une image PIL en base64
 def pil_to_base64(image):
@@ -132,10 +184,13 @@ def save_to_history(prompt, style, image_base64):
 
 @app.on_event("startup")
 async def startup_event():
-    # Chargement du modèle en arrière-plan pour ne pas bloquer le démarrage
+    # Chargement des modèles en arrière-plan pour ne pas bloquer le démarrage
     import threading
-    threading.Thread(target=load_model).start()
-    print("Démarrage de l'API - Chargement du modèle en arrière-plan")
+    threading.Thread(target=lambda: get_model_for_style("base")).start()
+    print("Démarrage de l'API - Chargement du modèle de base en arrière-plan")
+    
+    # Créer le répertoire des modèles s'il n'existe pas
+    os.makedirs(LOCAL_MODELS_DIR, exist_ok=True)
 
 @app.get("/")
 async def root():
@@ -143,21 +198,22 @@ async def root():
 
 @app.post("/generate", response_model=ImageResponse)
 async def generate_image(request: ImageRequest, background_tasks: BackgroundTasks):
-    if model is None:
-        load_model()
-        if model is None:
-            raise HTTPException(status_code=500, detail="Impossible de charger le modèle")
-    
     try:
         # Préparation du prompt en fonction du style
         prompt = request.prompt
         style = request.style
         
-        # Ajout du style au prompt si spécifié
-        if style == "sksdisney":
+        # Sélection du modèle approprié en fonction du style
+        selected_model = get_model_for_style(style)
+        if selected_model is None:
+            raise HTTPException(status_code=500, detail="Impossible de charger le modèle")
+        
+        # Ajout du style au prompt si spécifié et si on n'utilise pas le modèle Disney spécifique
+        # Pour le modèle Disney, pas besoin d'ajouter le style au prompt car le modèle est déjà entraîné
+        if style == "sksdisney" and "disney" not in models:
             if "sksdisneystyle" not in prompt:
                 prompt = f"{prompt}, sksdisneystyle"
-        elif style:
+        elif style and style != "sksdisney":
             if f"{style}style" not in prompt:
                 prompt = f"{prompt}, {style}style"
         
@@ -176,8 +232,8 @@ async def generate_image(request: ImageRequest, background_tasks: BackgroundTask
         if request.negative_prompt:
             params["negative_prompt"] = request.negative_prompt
         
-        # Génération
-        result = model(**params)
+        # Génération avec le modèle sélectionné
+        result = selected_model(**params)
         
         # Conversion en base64
         image_base64 = pil_to_base64(result.images[0])
@@ -185,9 +241,11 @@ async def generate_image(request: ImageRequest, background_tasks: BackgroundTask
         # Sauvegarder dans l'historique
         save_to_history(request.prompt, style, image_base64)
         
+        print(f"Image générée avec succès en utilisant le style {style}")
         return {"image": image_base64}
     
     except Exception as e:
+        print(f"Erreur lors de la génération: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Erreur lors de la génération: {str(e)}")
 
 @app.post("/transform", response_model=ImageResponse)
@@ -197,12 +255,12 @@ async def transform_image(
     num_inference_steps: int = Form(30),
     guidance_scale: float = Form(7.5)
 ):
-    if model is None:
-        load_model()
-        if model is None:
-            raise HTTPException(status_code=500, detail="Impossible de charger le modèle")
-    
     try:
+        # Sélection du modèle approprié en fonction du style
+        selected_model = get_model_for_style(style)
+        if selected_model is None:
+            raise HTTPException(status_code=500, detail="Impossible de charger le modèle")
+        
         # Lire et convertir l'image téléchargée
         contents = await image.read()
         input_image = Image.open(BytesIO(contents))
@@ -212,7 +270,10 @@ async def transform_image(
             input_image.thumbnail((512, 512))
         
         # Préparation du prompt en fonction du style
-        prompt = f"Transform this image in {style} style"
+        if style == "sksdisney":
+            prompt = "Transform this image in Disney style"
+        else:
+            prompt = f"Transform this image in {style} style"
         
         # Génération de l'image
         generator = torch.Generator(device=device).manual_seed(42)
@@ -226,8 +287,8 @@ async def transform_image(
             "generator": generator
         }
         
-        # Génération (simulation)
-        result = model(**params)
+        # Génération avec le modèle sélectionné
+        result = selected_model(**params)
         
         # Conversion en base64
         image_base64 = pil_to_base64(result.images[0])
@@ -235,9 +296,11 @@ async def transform_image(
         # Sauvegarder dans l'historique
         save_to_history("Image transformée", style, image_base64)
         
+        print(f"Image transformée avec succès en utilisant le style {style}")
         return {"image": image_base64}
     
     except Exception as e:
+        print(f"Erreur lors de la transformation: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Erreur lors de la transformation: {str(e)}")
 
 @app.get("/styles", response_model=List[Style])
@@ -259,7 +322,13 @@ async def get_history():
 
 @app.get("/health")
 async def health_check():
-    return {"status": "healthy", "model_loaded": model is not None}
+    return {
+        "status": "healthy", 
+        "models_loaded": {
+            "base": "base" in models,
+            "disney": "disney" in models
+        }
+    }
 
 # Point d'entrée pour le démarrage avec Uvicorn
 if __name__ == "__main__":
