@@ -1,6 +1,9 @@
 import os
 import torch
 import base64
+import boto3
+import shutil
+import tempfile
 from io import BytesIO
 from fastapi import FastAPI, HTTPException, BackgroundTasks, UploadFile, File, Form
 from fastapi.middleware.cors import CORSMiddleware
@@ -60,10 +63,34 @@ models = {}  # Dictionnaire pour stocker les différents modèles
 device = "cuda" if torch.cuda.is_available() else "cpu"
 history = []  # Historique des images générées
 
-# Répertoire des modèles
+# Configuration S3
+S3_BUCKET = "ia-cloud-models"
+S3_DISNEY_MODEL_PATH = "disney"
 LOCAL_MODELS_DIR = os.environ.get("MODEL_PATH", "../model")
-
-
+# Fonction pour télécharger un modèle depuis S3
+def download_model_from_s3(bucket_name, s3_path, local_path):
+    try:
+        print(f"Téléchargement du modèle depuis S3: {bucket_name}/{s3_path} vers {local_path}")
+        s3 = boto3.resource('s3')
+        bucket = s3.Bucket(bucket_name)
+        
+        # Créer le répertoire local si nécessaire
+        os.makedirs(local_path, exist_ok=True)
+        
+        # Télécharger tous les fichiers du modèle
+        for obj in bucket.objects.filter(Prefix=s3_path):
+            # Créer le chemin local pour le fichier
+            local_file_path = os.path.join(local_path, os.path.relpath(obj.key, s3_path))
+            # Créer les sous-répertoires si nécessaire
+            os.makedirs(os.path.dirname(local_file_path), exist_ok=True)
+            # Télécharger le fichier
+            bucket.download_file(obj.key, local_file_path)
+            
+        print(f"Modèle téléchargé avec succès dans {local_path}")
+        return True
+    except Exception as e:
+        print(f"Erreur lors du téléchargement depuis S3: {str(e)}")
+        return False
 
 # Fonction pour charger le modèle de base
 def load_base_model():
@@ -114,10 +141,13 @@ def load_disney_model():
         model_path = os.path.join(LOCAL_MODELS_DIR, "disney")
         print(f"Chargement du modèle Disney depuis {model_path}...")
         
-        # Vérifier si le modèle existe
+        # Vérifier si le modèle existe, sinon le télécharger depuis S3
         if not os.path.exists(model_path) or len(os.listdir(model_path)) == 0:
-            print("Modèle Disney non trouvé, utilisation du modèle de base à la place")
-            return load_base_model()
+            print("Modèle Disney non trouvé, téléchargement depuis S3...")
+            success = download_model_from_s3(S3_BUCKET, S3_DISNEY_MODEL_PATH, model_path)
+            if not success:
+                print("Échec du téléchargement du modèle Disney depuis S3, utilisation du modèle de base à la place")
+                return load_base_model()
         
         # Optimisations pour réduire l'utilisation de la mémoire
         model = StableDiffusionPipeline.from_pretrained(
