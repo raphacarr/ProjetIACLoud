@@ -13,9 +13,9 @@ COPY . .
 # Créer le répertoire pour les modèles
 RUN mkdir -p /app/model/base
 
-# Copier le modèle Disney directement depuis le répertoire local
-# Cette approche est plus simple et directe que de passer par S3
-COPY ../model/disney /app/model/disney
+# Dans l'environnement CI/CD, nous ne pouvons pas accéder au répertoire parent
+# Nous allons donc revenir à la solution de téléchargement depuis S3 au démarrage
+# Le modèle sera téléchargé automatiquement lors de la première utilisation
 
 # Exposer le port sur lequel l'application s'exécutera
 EXPOSE 8000
