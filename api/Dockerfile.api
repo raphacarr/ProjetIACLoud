@@ -10,6 +10,13 @@ RUN pip install gunicorn
 # Copier le code de l'application
 COPY . .
 
+# Créer le répertoire pour les modèles
+RUN mkdir -p /app/model/base
+
+# Copier le modèle Disney directement depuis le répertoire local
+# Cette approche est plus simple et directe que de passer par S3
+COPY ../model/disney /app/model/disney
+
 # Exposer le port sur lequel l'application s'exécutera
 EXPOSE 8000
 
