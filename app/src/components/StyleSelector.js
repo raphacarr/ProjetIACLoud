@@ -1,6 +1,7 @@
 import React from 'react';
 import styled from 'styled-components';
 import { motion } from 'framer-motion';
+import { FaTools } from 'react-icons/fa';
 import { useImageContext } from '../context/ImageContext';
 
 const StylesContainer = styled.div`
@@ -14,14 +15,15 @@ const StyleCard = styled(motion.div)`
   background: var(--card-background);
   border-radius: var(--border-radius);
   padding: 1rem;
-  cursor: pointer;
+  cursor: ${props => props.disabled ? 'not-allowed' : 'pointer'};
   text-align: center;
   box-shadow: var(--box-shadow);
   border: 2px solid ${props => props.selected ? 'var(--primary-color)' : 'transparent'};
+  opacity: ${props => props.disabled ? 0.6 : 1};
   transition: var(--transition);
   
   &:hover {
-    transform: translateY(-5px);
+    transform: ${props => !props.disabled && 'translateY(-5px)'};
   }
 `;
 
@@ -48,19 +50,27 @@ const StyleDescription = styled.p`
   color: var(--text-secondary);
 `;
 
+const ComingSoonBadge = styled.div`
+  background-color: var(--warning-color);
+  color: white;
+  font-size: 0.7rem;
+  padding: 0.2rem 0.5rem;
+  border-radius: 10px;
+  margin-top: 0.5rem;
+  display: inline-block;
+`;
+
 // Animation variants
 const cardVariants = {
   hidden: { opacity: 0, y: 20 },
   visible: { opacity: 1, y: 0 }
 };
 
-// Couleurs pour les styles
-const styleColors = {
-  disney: '#ff9d00',
-  anime: '#ff5e7d',
-  pixar: '#00c6ff',
-  watercolor: '#7ed6df',
-  comic: '#e056fd'
+// Fonction pour obtenir une icône pour un style donné
+const getIconForStyle = (styleId) => {
+  // Vous pouvez personnaliser cette fonction pour afficher des icônes spécifiques
+  // Pour l'instant, on utilise simplement la première lettre du style
+  return styleId.charAt(0).toUpperCase();
 };
 
 const StyleSelector = ({ selectedStyle, onSelectStyle }) => {
@@ -68,37 +78,25 @@ const StyleSelector = ({ selectedStyle, onSelectStyle }) => {
   
   return (
     <StylesContainer>
-      <StyleCard
-        key="none"
-        selected={selectedStyle === null}
-        onClick={() => onSelectStyle(null)}
-        as={motion.div}
-        variants={cardVariants}
-        initial="hidden"
-        animate="visible"
-        transition={{ duration: 0.3 }}
-      >
-        <StyleIcon color="#999">N</StyleIcon>
-        <StyleName>Normal</StyleName>
-        <StyleDescription>Image sans style particulier</StyleDescription>
-      </StyleCard>
-      
       {availableStyles.map((style, index) => (
         <StyleCard
           key={style.id}
           selected={selectedStyle === style.id}
-          onClick={() => onSelectStyle(style.id)}
-          as={motion.div}
+          onClick={() => style.available && onSelectStyle(style.id)}
           variants={cardVariants}
           initial="hidden"
           animate="visible"
           transition={{ duration: 0.3, delay: index * 0.1 }}
+          disabled={!style.available}
         >
-          <StyleIcon color={styleColors[style.id] || '#6a11cb'}>
-            {style.name.charAt(0)}
+          <StyleIcon color={style.color}>
+            {!style.available ? <FaTools /> : getIconForStyle(style.id)}
           </StyleIcon>
           <StyleName>{style.name}</StyleName>
           <StyleDescription>{style.description}</StyleDescription>
+          {!style.available && (
+            <ComingSoonBadge>En développement</ComingSoonBadge>
+          )}
         </StyleCard>
       ))}
     </StylesContainer>

@@ -1,0 +1,31 @@
+{
+  "base": {
+    "name": "Standard",
+    "description": "Style standard de Stable Diffusion"
+  
+  },
+  "disney": {
+    "name": "Disney",
+    "description": "Style inspiré des films Disney"
+ 
+  },
+  "anime": {
+    "name": "Anime",
+    "description": "Style manga japonais"
+
+  },
+  "pixar": {
+    "name": "Pixar",
+    "description": "Style des films Pixar"
+   
+  },
+  "watercolor": {
+    "name": "Aquarelle",
+    "description": "Style peinture à l'aquarelle"
+    
+  },
+  "comic": {
+    "name": "Comic",
+    "description": "Style bande dessinée"
+  }
+}
