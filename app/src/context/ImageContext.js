@@ -18,29 +18,34 @@ export const ImageProvider = ({ children }) => {
   
   // Récupérer les styles disponibles au chargement
   useEffect(() => {
-    const fetchStyles = async () => {
-      try {
-        // En attendant l'implémentation de l'API, utilisons des styles fictifs
-        const mockStyles = [
-          { id: 'disney', name: 'Disney', description: 'Style inspiré des films Disney' },
-          { id: 'anime', name: 'Anime', description: 'Style manga japonais' },
-          { id: 'pixar', name: 'Pixar', description: 'Style des films Pixar' },
-          { id: 'watercolor', name: 'Aquarelle', description: 'Style peinture à l\'aquarelle' },
-          { id: 'comic', name: 'Comic', description: 'Style bande dessinée' }
-        ];
-        
-        setAvailableStyles(mockStyles);
-        
-        // Décommenter quand l'API sera prête
-        // const styles = await getAvailableStyles();
-        // setAvailableStyles(styles);
-      } catch (error) {
-        toast.error('Erreur lors du chargement des styles');
-      }
-    };
-    
-    fetchStyles();
-  }, []);
+  const fetchStyles = async () => {
+    try {
+      const styles = await getAvailableStyles();
+      
+      // Séparation des styles disponibles et en développement
+      const availableStyles = styles.filter(style => style.available);
+      const inDevelopmentStyles = styles.filter(style => !style.available);
+      
+      // Combiner les deux listes, avec les styles disponibles en premier
+      setAvailableStyles([
+        ...availableStyles,
+        ...inDevelopmentStyles.map(style => ({
+          ...style,
+          inDevelopment: true
+        }))
+      ]);
+    } catch (error) {
+      toast.error('Erreur lors du chargement des styles');
+      // Utiliser des styles par défaut en cas d'échec
+      setAvailableStyles([
+        { id: 'base', name: 'Standard', description: 'Style standard de Stable Diffusion', available: true },
+        { id: 'disney', name: 'Disney', description: 'Style inspiré des films Disney', available: true }
+      ]);
+    }
+  };
+  
+  fetchStyles();
+}, []);
   
   // Récupérer l'historique des images au chargement
   useEffect(() => {

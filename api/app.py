@@ -49,6 +49,8 @@ class Style(BaseModel):
     id: str
     name: str
     description: str
+    color: str
+    available: bool
 
 # Modèle pour une entrée d'historique
 class HistoryEntry(BaseModel):
@@ -337,17 +339,62 @@ async def transform_image(
         print(f"Erreur lors de la transformation: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Erreur lors de la transformation: {str(e)}")
 
+
 @app.get("/styles", response_model=List[Style])
 async def get_styles():
-    # Liste des styles disponibles
-    styles = [
-        {"id": "sksdisney", "name": "Disney", "description": "Style inspiré des films Disney"},
-        {"id": "anime", "name": "Anime", "description": "Style manga japonais"},
-        {"id": "pixar", "name": "Pixar", "description": "Style des films Pixar"},
-        {"id": "watercolor", "name": "Aquarelle", "description": "Style peinture à l'aquarelle"},
-        {"id": "comic", "name": "Comic", "description": "Style bande dessinée"}
-    ]
-    return styles
+    try:
+        # Se connecter à S3
+        s3 = boto3.client('s3')
+        
+        # Télécharger le fichier de métadonnées des styles
+        try:
+            response = s3.get_object(Bucket=S3_BUCKET, Key="styles_metadata.json")
+            styles_metadata = json.loads(response['Body'].read().decode('utf-8'))
+        except Exception as e:
+            print(f"Erreur lors du chargement des métadonnées: {str(e)}")
+            # Utiliser des métadonnées par défaut si le fichier n'existe pas
+            styles_metadata = {
+                "base": {"name": "Standard", "description": "Style standard de Stable Diffusion"},
+                "disney": {"name": "Disney", "description": "Style inspiré des films Disney"}
+            }
+        
+        # Vérifier quels modèles sont disponibles dans S3
+        available_models = set()
+        for obj in s3.list_objects_v2(Bucket=S3_BUCKET, Delimiter='/').get('CommonPrefixes', []):
+            model_name = obj.get('Prefix', '').strip('/')
+            if model_name:
+                available_models.add(model_name)
+        
+        # Liste de couleurs vives pour une génération pseudo-aléatoire mais déterministe
+        colors = [
+            "#FF5C5C", "#FF9A5C", "#FFD15C", "#9AFF5C", "#5CFF9A", 
+            "#5CFFD1", "#5CD1FF", "#5C9AFF", "#9A5CFF", "#D15CFF", 
+            "#FF5CD1", "#FF5C9A", "#5CFFFF", "#5C5CFF", "#FF5C5C"
+        ]
+        
+        # Créer la liste des styles avec leur disponibilité
+        styles = []
+        for i, (model_id, metadata) in enumerate(styles_metadata.items()):
+            # Sélection déterministe d'une couleur basée sur l'index
+            color_index = hash(model_id) % len(colors)
+            color = colors[color_index]
+            
+            styles.append({
+                "id": model_id,
+                "name": metadata.get("name", model_id),
+                "description": metadata.get("description", ""),
+                "color": color,
+                "available": model_id in available_models
+            })
+        
+        return styles
+    except Exception as e:
+        print(f"Erreur lors de la vérification des modèles S3: {str(e)}")
+        # Retourner une liste de secours en cas d'erreur
+        return [
+            {"id": "base", "name": "Standard", "description": "Style standard", "color": "#6a11cb", "available": True},
+            {"id": "disney", "name": "Disney", "description": "Style Disney", "color": "#ff9d00", "available": True}
+        ]
 
 @app.get("/history", response_model=List[HistoryEntry])
 async def get_history():
