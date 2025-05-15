@@ -2,8 +2,8 @@
   "base_models": {
     "name": "Standard",
     "description": "Style standard de Stable Diffusion",
-    "model_path": "base",
-    "s3_path": "base",
+    "model_path": "base_models",
+    "s3_path": "base_models",
     "prompt_prefix": "",
     "default_params": {
       "guidance_scale": 7.5,

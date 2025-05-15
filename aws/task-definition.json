@@ -1,0 +1,43 @@
+{
+    "family": "ia-cloud-task",
+    "networkMode": "awsvpc",
+    "requiresCompatibilities": ["FARGATE"],
+    "cpu": "16384",
+    "memory": "32768",
+    "executionRoleArn": "arn:aws:iam::868849585509:role/ecsTaskExecutionRole",
+    "containerDefinitions": [
+        {
+            "name": "fastapi-container",
+            "image": "868849585509.dkr.ecr.eu-west-3.amazonaws.com/fastapi-api-ia-cloud-projet:latest",
+            "portMappings": [
+                {
+                    "containerPort": 8000,
+                    "hostPort": 8000
+                }
+            ],
+            "essential": true,
+            "environment": [
+                {
+                    "name": "MODEL_PATH",
+                    "value": "/tmp/model"
+                },
+                {
+                    "name": "AWS_REGION",
+                    "value": "eu-west-3"
+                },
+                {
+                    "name": "S3_BUCKET_NAME",
+                    "value": "ia-cloud-models"
+                }
+            ],
+            "logConfiguration": {
+                "logDriver": "awslogs",
+                "options": {
+                    "awslogs-group": "/ecs/ia-cloud-task",
+                    "awslogs-region": "eu-west-3",
+                    "awslogs-stream-prefix": "ecs"
+                }
+            }
+        }
+    ]
+}

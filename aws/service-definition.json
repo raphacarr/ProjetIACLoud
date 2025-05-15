@@ -1,0 +1,14 @@
+{
+    "serviceName": "ia-cloud-service",
+    "cluster": "ia-cloud-cluster",
+    "taskDefinition": "arn:aws:ecs:eu-west-3:868849585509:task-definition/ia-cloud-task:1",
+    "desiredCount": 1,
+    "launchType": "FARGATE",
+    "networkConfiguration": {
+        "awsvpcConfiguration": {
+            "subnets": ["subnet-0b306749516068521"],
+            "securityGroups": ["sg-02f33f8f6dd0c1292"],
+            "assignPublicIp": "ENABLED"
+        }
+    }
+}

@@ -1,0 +1,8 @@
+{
+    "Name": "ia-cloud-lb",
+    "Subnets": ["subnet-0b306749516068521"],
+    "SecurityGroups": ["sg-02f33f8f6dd0c1292"],
+    "Scheme": "internet-facing",
+    "Type": "application",
+    "IpAddressType": "ipv4"
+}
