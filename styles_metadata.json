@@ -1,5 +1,5 @@
 {
-  "base": {
+  "base_models": {
     "name": "Standard",
     "description": "Style standard de Stable Diffusion"
   
