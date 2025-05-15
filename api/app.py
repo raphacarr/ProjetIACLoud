@@ -70,9 +70,13 @@ LOCAL_MODELS_DIR = os.environ.get("MODEL_PATH", "../model")
 # Fonction pour télécharger un modèle depuis S3
 def download_model_from_s3(bucket_name, s3_path, local_path):
     try:
-        print(f"Téléchargement du modèle depuis S3: {bucket_name}/{s3_path} vers {local_path}")
+        print(f"Début du téléchargement depuis S3: {bucket_name}/{s3_path}")
+        # Liste les fichiers dans le bucket pour vérifier
         s3 = boto3.resource('s3')
         bucket = s3.Bucket(bucket_name)
+        print(f"Contenu du bucket dans le chemin {s3_path}:")
+        for obj in bucket.objects.filter(Prefix=s3_path):
+            print(f"  - {obj.key}")
         
         # Créer le répertoire local si nécessaire
         os.makedirs(local_path, exist_ok=True)
