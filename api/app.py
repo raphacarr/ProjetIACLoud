@@ -142,10 +142,37 @@ def download_model_from_s3(bucket_name, s3_path, local_path):
             # Créer les sous-répertoires si nécessaire
             os.makedirs(os.path.dirname(local_file_path), exist_ok=True)
             
-            # Télécharger avec barre de progression
+            # Télécharger par morceaux pour économiser la mémoire
             log_with_timestamp("INFO", f"Téléchargement de {obj.key}")
-            bucket.download_file(obj.key, local_file_path)
-            file_count += 1
+            
+            # Utiliser le client S3 au lieu de la ressource pour le téléchargement par morceaux
+            s3_client = boto3.client('s3')
+            
+            try:
+                # Télécharger par morceaux de 5 Mo
+                with open(local_file_path, 'wb') as f:
+                    s3_client.download_fileobj(
+                        Bucket=bucket_name,
+                        Key=obj.key,
+                        Fileobj=f,
+                        Config=boto3.s3.transfer.TransferConfig(
+                            multipart_threshold=5 * 1024 * 1024,  # 5 Mo
+                            max_concurrency=1,  # Un seul thread à la fois
+                            multipart_chunksize=5 * 1024 * 1024,  # 5 Mo par morceau
+                            use_threads=False  # Désactiver le multithreading
+                        )
+                    )
+                    
+                # Forcer la libération de la mémoire après chaque fichier
+                import gc
+                gc.collect()
+                
+                file_count += 1
+                log_with_timestamp("INFO", f"Fichier {obj.key} téléchargé avec succès")
+                
+            except Exception as download_error:
+                log_with_timestamp("ERROR", f"Erreur lors du téléchargement de {obj.key}: {str(download_error)}")
+                # Continuer avec les autres fichiers
             
         log_with_timestamp("INFO", f"{file_count} fichiers téléchargés avec succès")
         

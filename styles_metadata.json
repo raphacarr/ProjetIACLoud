@@ -2,6 +2,74 @@
   "base_models": {
     "name": "Standard",
     "description": "Style standard de Stable Diffusion",
+    "model_path": "base_models",
+    "s3_path": "base_models",
+    "prompt_prefix": "",
+    "default_params": {
+      "guidance_scale": 7.5,
+      "num_inference_steps": 30
+    }
+  },
+  "disney": {
+    "name": "Disney",
+    "description": "Style inspiré des films Disney",
+    "model_path": "disney",
+    "s3_path": "disney",
+    "prompt_prefix": "sksdisney",
+    "default_params": {
+      "guidance_scale": 7.5,
+      "num_inference_steps": 30
+    }
+  },
+  "anime": {
+    "name": "Anime",
+    "description": "Style manga japonais",
+    "model_path": "anime",
+    "s3_path": "anime",
+    "prompt_prefix": "sksanime",
+    "default_params": {
+      "guidance_scale": 8.0,
+      "num_inference_steps": 35
+    }
+  },
+  "pixar": {
+    "name": "Pixar",
+    "description": "Style des films Pixar",
+    "model_path": "pixar",
+    "s3_path": "pixar",
+    "prompt_prefix": "skspixar",
+    "default_params": {
+      "guidance_scale": 7.0,
+      "num_inference_steps": 30
+    }
+  },
+  "watercolor": {
+    "name": "Aquarelle",
+    "description": "Style peinture à l'aquarelle",
+    "model_path": "watercolor",
+    "s3_path": "watercolor",
+    "prompt_prefix": "skswatercolor",
+    "default_params": {
+      "guidance_scale": 7.0,
+      "num_inference_steps": 25
+    }
+  },
+  "comic": {
+    "name": "Comic",
+    "description": "Style bande dessinée",
+    "model_path": "comic",
+    "s3_path": "comic",
+    "prompt_prefix": "skscomic",
+    "default_params": {
+      "guidance_scale": 7.0,
+      "num_inference_steps": 30
+    }
+  }
+}
+{
+  "base_models": {
+    "name": "Standard",
+    "description": "Style standard de Stable Diffusion",
     "model_path": "base",
     "s3_path": "base",
     "prompt_prefix": "",

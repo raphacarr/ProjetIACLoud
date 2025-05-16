@@ -1,5 +1,13 @@
-# Ignore model/diffusers directory (it's a git repository)
-model/diffusers/
+# Ignore model directories (trop volumineux pour GitHub)
+model/
+*/model/
+model/*/
+model/disney/
+model/base/
+model/base_models/
+*/model/disney/
+*/model/base/
+*/model/base_models/
 
 # Python
 __pycache__/
