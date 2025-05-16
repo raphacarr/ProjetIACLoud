@@ -199,68 +199,87 @@ def download_model_from_s3(bucket_name, s3_path, local_path):
 def load_styles_metadata():
     global styles_metadata
     try:
+        # Chemin vers le fichier de métadonnées dans l'image Docker
+        metadata_path = os.path.join(LOCAL_MODELS_DIR, "styles_metadata.json")
+        
+        # Charger depuis le fichier local
+        if os.path.exists(metadata_path):
+            with open(metadata_path, 'r') as f:
+                styles_metadata = json.load(f)
+            log_with_timestamp("INFO", f"Métadonnées des styles chargées depuis le fichier local: {len(styles_metadata)} styles disponibles")
+            return styles_metadata
+            
+        # Fallback sur S3 si le fichier local n'existe pas
+        log_with_timestamp("WARNING", "Fichier de métadonnées non trouvé localement, tentative de chargement depuis S3")
         s3 = boto3.client('s3')
         response = s3.get_object(Bucket=S3_BUCKET, Key="styles_metadata.json")
         styles_metadata = json.loads(response['Body'].read().decode('utf-8'))
-        log_with_timestamp("INFO", f"Métadonnées des styles chargées: {len(styles_metadata)} styles disponibles")
+        
+        # Sauvegarder localement pour utilisation future
+        os.makedirs(os.path.dirname(metadata_path), exist_ok=True)
+        with open(metadata_path, 'w') as f:
+            json.dump(styles_metadata, f)
+            
+        log_with_timestamp("INFO", f"Métadonnées des styles chargées depuis S3: {len(styles_metadata)} styles disponibles")
         return styles_metadata
     except Exception as e:
         log_with_timestamp("ERROR", f"Erreur lors du chargement des métadonnées de styles: {str(e)}")
         # Métadonnées par défaut si le chargement échoue
-        return {
-            "base": {
+        styles_metadata = {
+            "base_models": {
                 "name": "Standard",
                 "description": "Style standard de Stable Diffusion",
-                "model_path": "base",
-                "s3_path": "base",
-                "prompt_prefix": "",
-                "default_params": {"guidance_scale": 7.5, "num_inference_steps": 30}
+                "model_path": "base_models",
+                "prompt_prefix": ""
             }
         }
+        return styles_metadata
 
 # Fonction pour charger un modèle
 def load_model(style_id):
+    global styles_metadata
     if not styles_metadata:
         load_styles_metadata()
         
+    # Gestion du style par défaut
     if style_id not in styles_metadata:
         log_with_timestamp("WARNING", f"Style inconnu: {style_id}, utilisation du style de base")
-        style_id = "base"
+        style_id = "base_models"  # Utiliser base_models comme style par défaut
     
     style_config = styles_metadata[style_id]
-    model_path = os.path.join(LOCAL_MODELS_DIR, style_config.get("model_path", style_id))
-    log_with_timestamp("INFO", f"=== DÉBUT CHARGEMENT MODÈLE {style_id.upper()} ===")
+    model_path = os.path.join(LOCAL_MODELS_DIR, style_id)
     
     try:
-        # Vérifier si le modèle existe
-        if not os.path.exists(model_path) or len(os.listdir(model_path)) == 0:
-            log_with_timestamp("INFO", f"Modèle {style_id} non trouvé, téléchargement depuis S3...")
-            s3_path = style_config.get("s3_path", style_id)
-            success = download_model_from_s3(S3_BUCKET, s3_path, model_path)
-            if not success:
-                log_with_timestamp("WARNING", f"Échec du téléchargement du modèle {style_id}, utilisation du modèle de base")
-                if style_id != "base":
-                    return load_model("base")
+        log_with_timestamp("INFO", f"=== DÉBUT CHARGEMENT MODÈLE {style_id.upper()} ===")
+        
+        # Vérifier si le modèle existe déjà dans l'image Docker
+        if os.path.exists(model_path) and os.listdir(model_path):
+            log_with_timestamp("INFO", f"Modèle {style_id} trouvé localement dans l'image Docker")
+        else:
+            log_with_timestamp("WARNING", f"Modèle {style_id} non trouvé dans l'image Docker")
+            # Si vous voulez garder la possibilité de télécharger en fallback:
+            log_with_timestamp("INFO", f"Tentative de téléchargement depuis S3...")
+            if not download_model_from_s3(S3_BUCKET, style_config.get("s3_path", style_id), model_path):
+                if style_id != "base_models":
+                    log_with_timestamp("WARNING", f"Échec du téléchargement du modèle {style_id}, tentative avec le modèle de base")
+                    return load_model("base_models")
                 else:
                     raise Exception("Impossible de charger le modèle de base")
         
         # Chargement du modèle
-        log_with_timestamp("INFO", f"Chargement du modèle {style_id}...")
+        log_with_timestamp("INFO", f"Chargement du modèle {style_id} depuis {model_path}...")
         start_time = datetime.now()
         
         # Configurer le type de données selon le device
         torch_dtype = torch.float16 if device == "cuda" else torch.float32
         
-        # Optimisations pour réduire l'utilisation de la mémoire
+        # Chargement du modèle
         model = StableDiffusionPipeline.from_pretrained(
             model_path,
             torch_dtype=torch_dtype,
-            safety_checker=None,  # Désactiver le safety checker pour économiser de la mémoire
+            safety_checker=None,
             requires_safety_checker=False
-        )
-        
-        # Transfert vers le device
-        model = model.to(device)
+        ).to(device)
         
         # Optimisations CPU si nécessaire
         if device == "cpu":
@@ -271,8 +290,8 @@ def load_model(style_id):
         end_time = datetime.now()
         duration = (end_time - start_time).total_seconds()
         log_with_timestamp("INFO", f"Modèle {style_id} chargé en {duration:.2f} secondes")
-        
         log_with_timestamp("INFO", f"=== FIN CHARGEMENT MODÈLE {style_id.upper()} (SUCCÈS) ===")
+        
         return model
         
     except Exception as e:
@@ -280,13 +299,11 @@ def load_model(style_id):
         log_with_timestamp("ERROR", f"Traceback: {traceback.format_exc()}")
         log_with_timestamp("ERROR", f"=== FIN CHARGEMENT MODÈLE {style_id.upper()} (ÉCHEC) ===")
         
-        # Si c'est le modèle de base qui a échoué, retourner None
-        if style_id == "base":
-            return None
-        # Sinon essayer de charger le modèle de base
-        else:
+        if style_id != "base_models":
             log_with_timestamp("INFO", "Tentative de chargement du modèle de base à la place")
-            return load_model("base")
+            return load_model("base_models")
+        else:
+            raise
 
 # Fonction pour obtenir le modèle correspondant au style
 def get_model_for_style(style):
@@ -615,8 +632,18 @@ async def get_history():
 async def health_check():
     global models, styles_metadata
     
-    # Vérifier les modèles chargés
+    # S'assurer que les métadonnées sont chargées
+    if not styles_metadata:
+        load_styles_metadata()
+    
+    # Vérifier les modèles chargés en mémoire
     loaded_models = {style_id: style_id in models for style_id in styles_metadata.keys()}
+    
+    # Vérifier les modèles disponibles dans l'image Docker (préchargés)
+    models_available = {}
+    for style_id in styles_metadata.keys():
+        model_path = os.path.join(LOCAL_MODELS_DIR, style_id)
+        models_available[style_id] = os.path.exists(model_path) and len(os.listdir(model_path)) > 0
     
     # Récupérer les informations système
     system_info = {
@@ -633,12 +660,13 @@ async def health_check():
         
         total, used, free = shutil.disk_usage("/")
         system_info["disk_space_available_gb"] = f"{free / (1024**3):.2f}"
-    except:
-        pass
+    except Exception as e:
+        system_info["error"] = str(e)
     
     return {
         "status": "healthy", 
-        "models_loaded": loaded_models,
+        "models_loaded": loaded_models,          # Modèles chargés en mémoire
+        "models_available": models_available,    # Modèles disponibles dans l'image Docker
         "styles_available": len(styles_metadata),
         "system_info": system_info
     }
