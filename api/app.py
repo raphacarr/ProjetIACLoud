@@ -19,7 +19,7 @@ import logging
 import sys
 import traceback
 from datetime import datetime
-
+#test
 #config du système de log
 logging.basicConfig(
     level=logging.INFO,
