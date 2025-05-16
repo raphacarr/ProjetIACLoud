@@ -3,16 +3,40 @@ version: 0.2
 phases:
   pre_build:
     commands:
-      - echo "Logging in to Amazon ECR for API..."
-      - aws ecr get-login-password --region $AWS_DEFAULT_REGION | docker login --username AWS --password-stdin $ACCOUNT_ID.dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com
+      - echo Downloading models from S3...
+      - mkdir -p models/base_models models/disney models/anime models/pixar models/watercolor models/comic
+      - aws s3 cp s3://ia-cloud-models/base_models/ models/base_models/ --recursive
+      - aws s3 cp s3://ia-cloud-models/disney/ models/disney/ --recursive
+      - aws s3 cp s3://ia-cloud-models/anime/ models/anime/ --recursive
+      - aws s3 cp s3://ia-cloud-models/pixar/ models/pixar/ --recursive
+      - aws s3 cp s3://ia-cloud-models/watercolor/ models/watercolor/ --recursive
+      - aws s3 cp s3://ia-cloud-models/comic/ models/comic/ --recursive
+      - aws s3 cp s3://ia-cloud-models/styles_metadata.json models/
+      
+      - echo Logging in to Amazon ECR...
+      - aws ecr get-login-password --region $AWS_DEFAULT_REGION | docker login --username AWS --password-stdin $AWS_ACCOUNT_ID.dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com
+      - REPOSITORY_URI=$AWS_ACCOUNT_ID.dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com/fastapi-api-ia-cloud-projet
+      - COMMIT_HASH=$(echo $CODEBUILD_RESOLVED_SOURCE_VERSION | cut -c 1-7)
+      - IMAGE_TAG=${COMMIT_HASH:=latest}
+  
   build:
     commands:
-      - echo "Building the FastAPI API Docker image..."
-      - docker build -t fastapi-api -f api/Dockerfile.api api/
-      - docker tag fastapi-api:latest $ACCOUNT_ID.dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com/fastapi-api-ia-cloud-projet:latest
+      - echo Build started on `date`
+      - echo Building the Docker image...
+      - docker build -t $REPOSITORY_URI:latest -f Dockerfile.api .
+      - docker tag $REPOSITORY_URI:latest $REPOSITORY_URI:$IMAGE_TAG
+  
   post_build:
     commands:
-      - echo "Pushing the FastAPI API Docker image to ECR..."
-      - docker push $ACCOUNT_ID.dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com/fastapi-api-ia-cloud-projet:latest
+      - echo Build completed on `date`
+      - echo Pushing the Docker image...
+      - docker push $REPOSITORY_URI:latest
+      - docker push $REPOSITORY_URI:$IMAGE_TAG
+      - echo Writing image definitions file...
+      - aws ecr describe-images --repository-name fastapi-api-ia-cloud-projet --image-ids imageTag=latest --query 'imageDetails[].imageSizeInBytes' --output text
+
 artifacts:
-  files: []
+  files:
+    - apprunner.yaml
+    - appspec.yaml
+    - imagedefinitions.json
