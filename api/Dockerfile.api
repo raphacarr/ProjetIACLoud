@@ -16,6 +16,9 @@ RUN apt-get update && apt-get install -y \
 # Créer les répertoires pour les modèles
 RUN mkdir -p /models/base_models /models/disney
 
+# Vérifier les identifiants AWS
+RUN aws sts get-caller-identity
+
 # Télécharger les modèles depuis S3 (fonctionnera avec le rôle IAM de CodeBuild)
 RUN aws s3 cp s3://ia-cloud-models/base_models/ /models/base_models/ --recursive
 RUN aws s3 cp s3://ia-cloud-models/disney/ /models/disney/ --recursive
