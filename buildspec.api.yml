@@ -35,7 +35,7 @@ phases:
       - docker push $REPOSITORY_URI:latest
       - docker push $REPOSITORY_URI:$IMAGE_TAG
       - echo Pushing the Docker image to public repository...
-      - PUBLIC_REPOSITORY_URI=public.ecr.aws/x1y2z3/fastapi-api-ia-cloud-projet-public
+      - PUBLIC_REPOSITORY_URI=public.ecr.aws/a2a3c3l3/fastapi-api-ia-cloud-projet-public
       - docker tag $REPOSITORY_URI:latest $PUBLIC_REPOSITORY_URI:latest
       - docker push $PUBLIC_REPOSITORY_URI:latest
       - echo Writing image definitions file...
