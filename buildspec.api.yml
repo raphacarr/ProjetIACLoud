@@ -31,9 +31,13 @@ phases:
   post_build:
     commands:
       - echo Build completed on `date`
-      - echo Pushing the Docker image...
+      - echo Pushing the Docker image to private repository...
       - docker push $REPOSITORY_URI:latest
       - docker push $REPOSITORY_URI:$IMAGE_TAG
+      - echo Pushing the Docker image to public repository...
+      - PUBLIC_REPOSITORY_URI=public.ecr.aws/x1y2z3/fastapi-api-ia-cloud-projet-public
+      - docker tag $REPOSITORY_URI:latest $PUBLIC_REPOSITORY_URI:latest
+      - docker push $PUBLIC_REPOSITORY_URI:latest
       - echo Writing image definitions file...
       - aws ecr describe-images --repository-name fastapi-api-ia-cloud-projet --image-ids imageTag=latest --query 'imageDetails[].imageSizeInBytes' --output text
 
