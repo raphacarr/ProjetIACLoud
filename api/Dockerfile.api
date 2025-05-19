@@ -4,16 +4,16 @@ FROM python:3.10-slim
 WORKDIR /app
 
 # Installer les dépendances
-COPY requirements.txt .
+COPY api/requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 RUN pip install gunicorn
 
 # Copier les modèles préalablement téléchargés par CodeBuild
 # Ces modèles sont téléchargés dans la phase pre_build du buildspec.api.yml
-COPY ./models/ /app/model/
+COPY models/ /app/model/
 
 # Copier le code de l'application
-COPY . .
+COPY api/ .
 
 # Exposer le port sur lequel l'application s'exécutera
 EXPOSE 8000
